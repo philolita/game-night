@@ -1,0 +1,53 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>Dream Destinations</title><link rel="stylesheet" href="../style.css">
+<style>main{max-width:640px}#bd{display:grid;grid-template:repeat(11,1fr)/repeat(11,1fr);aspect-ratio:1;gap:1px;background:#e8c6d6;border-radius:8px;overflow:hidden}
+.sq{background:var(--card);position:relative;overflow:hidden;border:2px solid transparent;box-sizing:border-box;font-size:clamp(5px,1.7vw,9px);line-height:1.1;display:flex;flex-direction:column;align-items:center}
+.sq i{display:block;width:100%;height:18%;flex:none}.sq em{font-style:normal;opacity:.7}.tk{position:absolute;bottom:1px;display:flex;gap:1px}
+.tk u{width:min(3.4vw,14px);aspect-ratio:1;border-radius:50%;border:1.5px solid #fff}
+#mid{grid-area:2/2/11/11;background:var(--bg);display:flex;flex-direction:column;justify-content:center;align-items:center;padding:6px;font-size:clamp(11px,3vw,15px)}
+#mid button{padding:8px 12px;font-size:inherit}</style>
+<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script><script src="../common.js"></script></head>
+<body><main><h1>🌍 Dream Destinations</h1><div id="box"></div><div id="bd"></div><p><small id="net">Pick how you want to play.</small></p>
+<p><small>Buy dream destinations, collect rent from visitors, own a whole region for double rent. Bankrupt your friend to win, or end the game and the richest wins. Best on a laptop or tablet.</small></p></main>
+<script>
+const NM=["Player 1 (pink)","Player 2 (blue)"],COL=["#ff6fa5","#4a9af0"];
+const B=[["GO ✈️ Home","go"],["Marrakech 🇲🇦","p",60,4,"#c97b4a"],["Surprise ✨","c"],["Chefchaouen 🇲🇦","p",60,6,"#c97b4a"],["Travel Tax","tax",100],["Seaplane 🛩️","s",200,25],["Taormina 🇮🇹","p",100,8,"#8fd3ff"],["Surprise ✨","c"],["Palermo 🇮🇹","p",100,8,"#8fd3ff"],["Syracuse 🇮🇹","p",120,10,"#8fd3ff"],["Lost Passport 🛂","j"],["Ubud, Bali 🌴","p",140,12,"#ff9ec4"],["Island Power Co","u",150,20],["Uluwatu, Bali 🌊","p",140,12,"#ff9ec4"],["Nusa Penida, Bali 🐢","p",160,14,"#ff9ec4"],["Cruise Ship 🚢","s",200,25],["Maui, Hawaii 🌺","p",180,16,"#ffb86b"],["Surprise ✨","c"],["Kauai, Hawaii 🌈","p",180,16,"#ffb86b"],["Big Island 🌋","p",200,18,"#ffb86b"],["Beach Break 🏖️","f"],["Tromsø, Norway 🌌","p",220,20,"#7bd88f"],["Surprise ✨","c"],["Lofoten, Norway 🌌","p",220,20,"#7bd88f"],["Alta, Norway 🌌","p",240,22,"#7bd88f"],["Night Train 🚂","s",200,25],["Paradise Bay 🐧","p",260,24,"#b8e6ff"],["Deception Island 🧊","p",260,24,"#b8e6ff"],["Sunshine Solar Co","u",150,20],["South Pole 🇦🇶","p",280,26,"#b8e6ff"],["Lost Passport!","gj"],["Baa Atoll, Maldives 🐠","p",300,28,"#5fd3c8"],["Overwater Villa 🏝️","p",300,28,"#5fd3c8"],["Surprise ✨","c"],["Vaadhoo Island ✨","p",320,30,"#5fd3c8"],["Hot Air Balloon 🎈","s",200,25],["Surprise ✨","c"],["Santorini 🇬🇷","p",350,35,"#6ea8fe"],["Souvenir Tax","tax",75],["Bora Bora 🏝️","p",400,50,"#6ea8fe"]];
+const CH=[["Won a travel lottery! +$100",100],["Overpacked, pay baggage fee $50",-50],["Sold photos to a magazine +$50",50],["Taxi scam, -$40",-40],["Travel blog bonus! +$150",150],["Missed your flight, -$60",-60],["Fly home to GO, collect $200","go"],["Lost your passport!","jail"]];
+const NEW=()=>({pos:[0,0],cash:[1500,1500],own:{},turn:0,phase:"roll",jail:[0,0],msg:"Player 1, roll the dice!",d:[0,0],over:false,seq:0});
+let S=NEW(),me=null;const $=i=>document.getElementById(i);
+const cp=i=>i<=10?[10-i,10]:i<=20?[0,20-i]:i<=30?[i-20,0]:[10,i-30];
+const grp=n=>B.map((b,k)=>b[4]&&b[4]===B[n][4]?k:-1).filter(k=>k>=0);
+const DI=["","⚀","⚁","⚂","⚃","⚄","⚅"];
+function render(){let h="";
+ B.forEach((b,i)=>{const[c,r]=cp(i),o=S.own[i];
+  h+=`<div class="sq" style="grid-column:${c+1};grid-row:${r+1};${o!==undefined?`border-color:${COL[o]};`:""}"><i style="background:${b[1]=="p"?b[4]:"transparent"}"></i><span>${b[0]}</span>${b[2]?`<em>${b[1]=="tax"?"-":""}$${b[2]}</em>`:""}<div class="tk">${[0,1].filter(p=>S.pos[p]==i).map(p=>`<u style="background:${COL[p]}"></u>`).join("")}</div></div>`});
+ const mine=me===null||me===S.turn,ph=S.phase;
+ h+=`<div id="mid"><b class="p${S.turn}">${S.over?"Game over":NM[S.turn]+"'s turn"}</b><div><span class="p0">P1 $${S.cash[0]}</span> · <span class="p1">P2 $${S.cash[1]}</span></div>
+ <div class="dice" style="font-size:1.8rem">${S.d[0]?DI[S.d[0]]+DI[S.d[1]]:"🎲"}</div><div style="margin:4px 0">${S.msg}</div>
+ ${S.over?"":ph=="roll"?`<button onclick="roll()" ${mine?"":"disabled"}>${mine?"Roll":"Waiting…"}</button>`:`<div><button onclick="buy()" ${mine?"":"disabled"}>Buy</button><button onclick="skip()" ${mine?"":"disabled"}>Pass</button></div>`}
+ <div><button onclick="finish()" style="background:#8fb8ff">End game</button><button onclick="reset()">New</button></div></div>`;
+ $("bd").innerHTML=h}
+function endTurn(){const p=S.turn;if(S.cash[p]<0){S.over=true;S.msg+=` 💸 ${NM[p]} is bankrupt! ${NM[1-p]} wins! 🎉`}else{S.turn=1-p;S.phase="roll"}Net.send();render()}
+function roll(){const p=S.turn;
+ if(S.jail[p]){S.jail[p]=0;S.msg=`${NM[p]} is stuck at the embassy 🛂 and sits out a turn`;S.turn=1-p;Net.send();return render()}
+ const a=1+Math.floor(Math.random()*6),b=1+Math.floor(Math.random()*6);S.d=[a,b];
+ const o=S.pos[p],n=(o+a+b)%40;let m=`${NM[p]} rolled ${a+b}. `;
+ if(n<o){S.cash[p]+=200;m+="Passed GO +$200. "}
+ S.pos[p]=n;const q=B[n],t=q[1];
+ if(t=="p"||t=="s"||t=="u"){const ow=S.own[n];
+  if(ow===undefined){if(S.cash[p]>=q[2]){S.msg=m+`${q[0]} is for sale for $${q[2]}.`;S.phase="buy";Net.send();return render()}m+=`Can't afford ${q[0]}.`}
+  else if(ow!==p){let r=q[3];if(t=="s")r=25*Object.keys(S.own).filter(k=>S.own[k]==ow&&B[k][1]=="s").length;
+   if(t=="p"&&grp(n).every(k=>S.own[k]===ow))r*=2;S.cash[p]-=r;S.cash[ow]+=r;m+=`Pays $${r} rent to ${NM[ow]}.`}
+  else m+="Your own property."}
+ else if(t=="tax"){S.cash[p]-=q[2];m+=`Pay $${q[2]} tax.`}
+ else if(t=="gj"){S.pos[p]=10;S.jail[p]=1;m+="Lost your passport! 🛂"}
+ else if(t=="c"){const c=CH[Math.floor(Math.random()*CH.length)];m+="Chance: "+c[0];
+  if(typeof c[1]=="number")S.cash[p]+=c[1];else if(c[1]=="go"){S.pos[p]=0;S.cash[p]+=200}else{S.pos[p]=10;S.jail[p]=1}}
+ S.msg=m;endTurn()}
+function buy(){const p=S.turn,i=S.pos[p];S.cash[p]-=B[i][2];S.own[i]=p;S.msg=`${NM[p]} bought ${B[i][0]}! 🏠`;endTurn()}
+function skip(){const p=S.turn;S.msg=`${NM[p]} passed on ${B[S.pos[p]][0]}.`;endTurn()}
+function finish(){if(!confirm("End the game now? The richest player wins."))return;
+ const w=[0,1].map(p=>S.cash[p]+Object.keys(S.own).filter(k=>S.own[k]==p).reduce((a,k)=>a+B[k][2],0));
+ S.over=true;S.msg=w[0]==w[1]?"It's a tie! 🤝":`🎉 ${NM[w[0]>w[1]?0:1]} wins with the most wealth ($${Math.max(...w)})!`;Net.send();render()}
+function reset(){const s=S.seq;S=NEW();S.seq=s;S.msg="New game! Player 1, roll!";Net.send();render()}
+render();Net.init({get:()=>S,set:d=>{S=d},render,status:t=>$("net").textContent=t,setMe:v=>{me=v;render()},box:$("box")});
+</script></body></html>

@@ -1,0 +1,46 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>Ludo</title><link rel="stylesheet" href="../style.css">
+<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script><script src="../common.js"></script></head>
+<body><main><h1>🎲 Ludo</h1><div id="who"></div><div id="box"></div>
+<svg id="b" viewBox="0 0 500 500"></svg><div id="msg" style="min-height:3em;margin:8px 0"></div><div class="dice" id="dice">🎲</div>
+<button id="roll">Roll</button><button id="reset">New game</button><p><small id="net">Pick how you want to play.</small></p>
+<p><small>Roll a 6 to leave home. A 6 gives another roll. Land on a lone opponent to send them home (★ cells are safe). Get all 4 tokens to the center, with an exact roll for the last step.</small></p></main>
+<script>
+const R=170,C=250,COL=["#ff6fa5","#4a9af0"],NM=["Player 1 (pink)","Player 2 (blue)"],ST=[0,26],SAFE=[0,8,13,21,26,34,39,47];
+let S={t:[[-1,-1,-1,-1],[-1,-1,-1,-1]],turn:0,d:0,msg:"Player 1: roll a 6 to leave home!",seq:0,wait:false,tries:0},me=null;
+const $=i=>document.getElementById(i),ab=(p,r)=>(ST[p]+r)%52,ang=a=>a*2*Math.PI/52-Math.PI/2,tXY=a=>[C+R*Math.cos(ang(a)),C+R*Math.sin(ang(a))];
+function xy(p,r,i){
+ if(r<0)return p?[415+(i%2)*40,415+Math.floor(i/2)*40]:[45+(i%2)*40,45+Math.floor(i/2)*40];
+ if(r<=50)return tXY(ab(p,r));
+ if(r<56){const a=ang(ab(p,50)),d=R-30*(r-50);return[C+d*Math.cos(a),C+d*Math.sin(a)]}
+ return[C+(i-1.5)*18,C+(p?16:-16)]}
+const won=()=>S.t.findIndex(a=>a.every(r=>r==56));
+function movable(){const p=S.turn,m=[];S.t[p].forEach((r,i)=>{if(r<0?S.d==6:r+S.d<=56)m.push(i)});return m}
+function draw(){let h="";
+ for(let a=0;a<52;a++){const[x,y]=tXY(a),f=a==0?COL[0]:a==26?COL[1]:SAFE.includes(a)?"#ffe9a8":"var(--c2)";
+  h+=`<circle cx="${x}" cy="${y}" r="12" fill="${f}" stroke="#fff" stroke-width="2"/>`+(SAFE.includes(a)?`<text x="${x}" y="${y+4}" font-size="11" text-anchor="middle" fill="#888">★</text>`:"")}
+ for(let p=0;p<2;p++){for(let r=51;r<56;r++){const[x,y]=xy(p,r);h+=`<circle cx="${x}" cy="${y}" r="11" fill="${COL[p]}" opacity=".45"/>`}
+  h+=`<rect x="${p?390:20}" y="${p?390:20}" width="90" height="90" rx="18" fill="${COL[p]}" opacity=".2"/>`}
+ h+=`<circle cx="250" cy="250" r="36" fill="var(--c1)"/>`;
+ const mv=(S.wait&&(me===null||me===S.turn))?movable():[];
+ for(let p=0;p<2;p++)S.t[p].forEach((r,i)=>{const[x,y]=xy(p,r,i),can=p==S.turn&&mv.includes(i);
+  h+=`<circle cx="${x+(i%2)*3-1.5}" cy="${y}" r="10" fill="${COL[p]}" stroke="${can?'#222':'#fff'}" stroke-width="3" ${can?`style="cursor:pointer" onclick="pick(${i})"`:""}/>`});
+ $("b").innerHTML=h}
+function render(){draw();const w=won();$("msg").textContent=S.msg;$("dice").textContent=S.d?["","⚀","⚁","⚂","⚃","⚄","⚅"][S.d]:"🎲";
+ $("who").innerHTML=w>=0?`<b class="p${w}">🎉 ${NM[w]} wins!</b>`:`<b class="p${S.turn}">${NM[S.turn]}'s turn</b>`;
+ const mine=me===null||me===S.turn;$("roll").disabled=!mine||S.wait||w>=0;$("roll").textContent=mine?"Roll":"Waiting for friend…"}
+function roll(){if(S.wait)return;const p=S.turn;S.d=1+Math.floor(Math.random()*6);S.tries++;const mv=movable();
+ if(!mv.length){const all=S.t[p].every(r=>r<0);
+  if(all&&S.tries<3)S.msg=`${NM[p]} rolled ${S.d}. Need a 6. Roll again!`;
+  else{S.msg=`${NM[p]} rolled ${S.d}. No move.`;S.turn=1-p;S.tries=0}
+  Net.send();return render()}
+ if(mv.length==1)return move(mv[0]);
+ S.wait=true;S.msg=`${NM[p]} rolled ${S.d}. Tap a token to move.`;Net.send();render()}
+function pick(i){if(S.wait&&movable().includes(i))move(i)}
+function move(i){const p=S.turn,q=1-p,d=S.d,r=S.t[p][i],n=r<0?0:r+d;S.t[p][i]=n;let m=`${NM[p]} rolled ${d}. `;
+ if(n<=50&&!SAFE.includes(ab(p,n)))S.t[q].forEach((x,j)=>{if(x>=0&&x<=50&&ab(q,x)==ab(p,n)){S.t[q][j]=-1;m+="💥 Sent a token home! "}});
+ S.wait=false;S.tries=0;
+ if(won()>=0)m=`🎉 ${NM[p]} wins!`;else if(d==6)m+="Rolled a 6: roll again!";else S.turn=q;
+ S.msg=m;Net.send();render()}
+$("roll").onclick=roll;$("reset").onclick=()=>{S={t:[[-1,-1,-1,-1],[-1,-1,-1,-1]],turn:0,d:0,msg:"New game! Player 1: roll a 6 to leave home!",seq:S.seq,wait:false,tries:0};Net.send();render()};
+render();Net.init({get:()=>S,set:d=>{S=d},render,status:t=>$("net").textContent=t,setMe:v=>{me=v;render()},box:$("box")});
+</script></body></html>

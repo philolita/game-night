@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Snakes & Ladders</title>
+<style>
+:root{--bg:#fff0f6;--fg:#4a3550;--c1:#ffd6e5;--c2:#cfe8ff;--card:#fff;--p0:#e0508a;--p1:#2f86e0;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#2a2030;--fg:#f6e9f5;--c1:#5c3a52;--c2:#33506b;--card:#3a2d42}}
+:root[data-theme="dark"]{--bg:#2a2030;--fg:#f6e9f5;--c1:#5c3a52;--c2:#33506b;--card:#3a2d42}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,"Segoe UI",sans-serif;text-align:center}
+main{max-width:520px;margin:0 auto;padding:12px}
+h1{font-size:1.4rem;margin:6px 0}
+svg{width:100%;height:auto;max-width:500px;border-radius:12px;background:var(--card)}
+button{font:inherit;font-weight:600;border:0;border-radius:10px;padding:12px 18px;margin:4px;background:#f48fb1;color:#fff}
+button:disabled{opacity:.4}
+#msg{min-height:3em;font-size:1.05rem;margin:8px 0}
+.pun{background:var(--card);border:3px dashed #f48fb1;border-radius:14px;padding:10px 14px;margin:8px 0}
+.pun b{display:block;font-size:1.15rem;margin:6px 0}
+.env{font-size:3.5rem;animation:wg 1s infinite}@keyframes wg{50%{transform:rotate(10deg) scale(1.1)}}
+.dice{font-size:3rem}
+.p0{color:var(--p0)}.p1{color:var(--p1)}
+small{opacity:.7}
+</style></head><body><main>
+<h1>🐍 Snakes & Ladders 🪜</h1>
+<div id="who"></div>
+<svg id="b" viewBox="0 0 500 500"></svg>
+<div id="msg"></div><div id="pun"></div>
+<div class="dice" id="dice">🎲</div>
+<button id="roll">Roll the dice</button><button id="reset">New game</button>
+<p><small id="net">Pick how you want to play.</small></p>
+</main>
+<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<script>
+const SN={16:6,47:26,49:11,56:53,62:19,64:60,87:24,93:73,95:75,98:78};
+const LD={1:38,4:14,9:31,21:42,28:84,36:44,51:67,71:91,80:100};
+const NAMES=["Player 1 (pink)","Player 2 (blue)"],COL=["#ff6fa5","#4a9af0"];
+const xy=n=>{const i=n-1,r=Math.floor(i/10);let c=i%10;if(r%2)c=9-c;return[c*50+25,(9-r)*50+25]};
+const PUN=[["😈 Slide back 3 more squares!","b3"],["⬅️ Slide back 5 more squares!","b5"],["💀 Back to the START!","st"],["😴 No dice for 2 turns!","sk"],["🔄 Swap places with your friend!","sw"],["🎁 Your friend jumps ahead 5 squares!","f5"]];
+let S={pos:[0,0],turn:0,seq:0,msg:"Player 1 starts. Roll!",d:null,pun:null,pt:0,skip:[0,0]};
+let me=null,room=null,busy=false;
+const $=id=>document.getElementById(id);
+const SC=[["#ff9ec4","#e0608f"],["#8fd3ff","#3d8fe0"],["#b9f0c5","#4fb872"],["#ffe08a","#e0a82e"],["#d7b8ff","#9a63e0"]];
+function snake(a,i){const[x1,y1]=xy(+a),[x2,y2]=xy(SN[a]);const[c,d]=SC[i%5];
+  const dx=x2-x1,dy=y2-y1,L=Math.hypot(dx,dy),nx=-dy/L,ny=dx/L;const pts=[];
+  for(let k=0;k<=30;k++){const t=k/30,o=13*Math.sin(t*Math.PI*3)*Math.min(1,t*6);pts.push((x1+dx*t+nx*o).toFixed(1)+" "+(y1+dy*t+ny*o).toFixed(1))}
+  const p="M"+pts.join("L"),st=(w,col,x="")=>`<path d="${p}" fill="none" stroke="${col}" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round" ${x}/>`;
+  return st(15,d)+st(10,c)+st(2,"#fff",'stroke-dasharray="1 9" opacity=".7"')+
+  `<path d="M${x1} ${y1+9}v7m0 0l-3 4m3-4l3 4" stroke="#ff4d6d" stroke-width="2" fill="none" stroke-linecap="round"/><ellipse cx="${x1}" cy="${y1}" rx="14" ry="12" fill="${c}" stroke="${d}" stroke-width="2.5"/><circle cx="${x1-6}" cy="${y1-4}" r="4.5" fill="#fff"/><circle cx="${x1+6}" cy="${y1-4}" r="4.5" fill="#fff"/><circle cx="${x1-5}" cy="${y1-3}" r="2.2" fill="#333"/><circle cx="${x1+7}" cy="${y1-3}" r="2.2" fill="#333"/><circle cx="${x1-10}" cy="${y1+3}" r="2.5" fill="#ff9ec4" opacity=".8"/><circle cx="${x1+10}" cy="${y1+3}" r="2.5" fill="#ff9ec4" opacity=".8"/><path d="M${x1-4} ${y1+4}q4 4 8 0" stroke="#333" stroke-width="1.5" fill="none" stroke-linecap="round"/>`}
+function board(){
+  let h="";
+  for(let n=1;n<=100;n++){const[x,y]=xy(n);const i=n-1,r=Math.floor(i/10);
+    h+=`<rect x="${x-25}" y="${y-25}" width="50" height="50" fill="${(n+r)%2?'var(--c1)':'var(--c2)'}"/><text x="${x-22}" y="${y-12}" font-size="11" fill="currentColor" opacity=".6">${n}</text>`}
+  for(const a in LD){const[x1,y1]=xy(+a),[x2,y2]=xy(LD[a]);const dx=6;
+    h+=`<g stroke="#c9a27a" stroke-width="3" stroke-linecap="round"><line x1="${x1-dx}" y1="${y1}" x2="${x2-dx}" y2="${y2}"/><line x1="${x1+dx}" y1="${y1}" x2="${x2+dx}" y2="${y2}"/></g>`;
+    for(let k=1;k<6;k++){const t=k/6;h+=`<line x1="${x1+(x2-x1)*t-6}" y1="${y1+(y2-y1)*t}" x2="${x1+(x2-x1)*t+6}" y2="${y1+(y2-y1)*t}" stroke="#c9a27a" stroke-width="2"/>`}}
+  let si=0;for(const a in SN)h+=snake(a,si++);
+  h+='<g id="tok"></g>';$("b").innerHTML=h}
+function tokens(){
+  let h="";S.pos.forEach((p,i)=>{const[x,y]=xy(Math.max(p,1));const o=i?9:-9;
+    h+=`<circle cx="${p?x+o:-30}" cy="${p?y:-30}" r="11" fill="${COL[i]}" stroke="#fff" stroke-width="3"/>`});
+  $("tok").innerHTML=h;
+  $("msg").innerHTML=S.msg;
+  $("dice").textContent=S.d?["","⚀","⚁","⚂","⚃","⚄","⚅"][S.d]:"🎲";
+  const mine=me===null||me===S.turn,won=S.pos.includes(100);
+  const cp=me===null||me===S.pt;
+  $("pun").innerHTML=S.pun?`<div class="pun">😈 ${NAMES[S.pt]} got eaten by a snake!`+(S.pun.o?`<b>${S.pun.text}</b>${cp?'<button onclick="ok()">Ouch 😭</button>':'<small>Waiting…</small>'}`:`<div class="env">✉️</div>${cp?'<button onclick="openEnv()">Open punishment</button>':'<small>Waiting for them to open the envelope…</small>'}`)+`</div>`:"";
+  $("roll").disabled=busy||won||!mine||!!S.pun;$("roll").textContent=S.skip&&S.skip[S.turn]>0?"Skip turn 😴":"Roll the dice";
+  $("roll").textContent=won?"Game over":mine?"Roll the dice":"Waiting for friend…"}
+function render(){tokens();$("who").innerHTML=`<b class="p${S.turn}">${NAMES[S.turn]}'s turn</b>`}
+async function roll(){
+  if(busy)return;if(S.skip&&S.skip[S.turn]>0){const k=S.turn;S.skip[k]--;S.msg=`${NAMES[k]} is frozen and skips this turn 😴`;S.turn=1-k;send();render();return}busy=true;const t=S.turn,d=1+Math.floor(Math.random()*6);
+  let p=S.pos[t],m=`${NAMES[t]} rolled a ${d}. `;
+  if(p+d<=100)p+=d;else m+="Need an exact roll to land on 100! ";
+  S.pos[t]=p;S.d=d;
+  const j=SN[p]||LD[p];
+  if(j){m+=SN[p]?`🐍 Snake! Down to ${j}.`:`🪜 Ladder! Up to ${j}.`;S.pos[t]=j;if(SN[p]){S.pun={o:0};S.pt=t}}
+  if(S.pos[t]===100){m=`🎉 ${NAMES[t]} wins! 🎉`}
+  else{S.turn=1-t;if(d===6&&!j&&p<=100){S.turn=t;m+=" Rolled a 6: roll again!"}}
+  S.msg=m;busy=false;send();render()}
+function openEnv(){const t=S.pt,q=1-t,[txt,k]=PUN[Math.floor(Math.random()*PUN.length)];
+  if(k=="b3")S.pos[t]=Math.max(1,S.pos[t]-3);else if(k=="b5")S.pos[t]=Math.max(1,S.pos[t]-5);else if(k=="st")S.pos[t]=0;else if(k=="sk")S.skip[t]=2;else if(k=="sw")S.pos=[S.pos[1],S.pos[0]];else if(k=="f5")S.pos[q]=Math.min(99,S.pos[q]+5);
+  S.pun={o:1,text:txt};send();render()}
+function ok(){S.pun=null;S.msg=NAMES[S.pt]+" accepted their fate 😭 Next!";send();render()}
+function reset(){S={pos:[0,0],turn:0,seq:S.seq+1,msg:"New game! Player 1 starts.",d:null,pun:null,pt:0,skip:[0,0]};send();render()}
+let conn=null,peer=null;
+function pick(){
+  $("who").innerHTML='<button onclick="host()">Create online game</button><button onclick="setMe(null)">Same screen</button>'}
+function setMe(v){me=v;render()}
+function wire(c,role){conn=c;c.on("open",()=>{setMe(role);$("net").textContent=role===0?"Friend connected! You are Player 1 (pink).":"Connected! You are Player 2 (blue).";if(role===0)send()});
+  c.on("data",d=>{if(d&&d.seq>S.seq){S=d;render()}});
+  c.on("close",()=>{$("net").textContent="Connection lost. Refresh to reconnect.";conn=null})}
+function host(){
+  $("net").textContent="Setting up…";
+  peer=new Peer();
+  peer.on("open",id=>{const u=location.origin+location.pathname+"?join="+id;
+    $("who").innerHTML='<p>Send this link to your friend and keep this page open:</p><input id="lk" readonly style="width:90%;padding:8px" value="'+u+'"><br><button onclick="navigator.clipboard.writeText($(\'lk\').value)">Copy link</button>';
+    $("net").textContent="Waiting for your friend to open the link…"});
+  peer.on("connection",c=>wire(c,0));
+  peer.on("error",e=>$("net").textContent="Network error: "+e.type)}
+function guest(id){
+  $("net").textContent="Connecting…";peer=new Peer();
+  peer.on("open",()=>wire(peer.connect(id,{reliable:true}),1));
+  peer.on("error",e=>$("net").textContent="Could not connect: "+e.type+". Ask your friend for a new link.")}
+function send(){S.seq++;if(conn&&conn.open)conn.send(S)}
+$("roll").onclick=roll;$("reset").onclick=reset;
+board();render();
+const J=new URLSearchParams(location.search).get("join");
+if(J){$("who").textContent="";guest(J)}else pick();
+</script></body></html>
